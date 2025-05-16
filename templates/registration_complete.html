@@ -1,24 +1,36 @@
-<<<<<<< HEAD
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Registration Complete</title>
+    <title>会員登録完了</title>
+    <style>
+        body { font-size: 16px; }
+        .container {
+            width: 80%;
+            margin: 20px auto;
+            text-align: center;
+        }
+        .button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+    </style>
 </head>
 <body>
-    <h1>{{ message }}</h1>
-    <p>ご登録ありがとうございます。</p>
-    <p>引き続きサービスをお楽しみください。</p>
+    <div class="container">
+        <h1>会員登録が完了しました！</h1>
+        <p>{{ message }}</p>
+        <button class="button" onclick="location.href='/show_member_card?user_id={{ user_id }}'">
+            会員証を表示する
+        </button>
+    </div>
 </body>
-=======
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Registration Complete</title>
-</head>
-<body>
-    <h1>{{ message }}</h1>
-    <p>ご登録ありがとうございます。</p>
-    <p>引き続きサービスをお楽しみください。</p>
-</body>
->>>>>>> 2e3c7dfc9011f33ec8ea46b52f29401ce608496a
 </html>
