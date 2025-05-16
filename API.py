@@ -197,7 +197,7 @@ def register_member():
             )
             db.commit()
             # HTMLを返すように修正
-            return render_template('registration_complete.html', message='会員情報を更新しました。')
+            return render_template('registration_complete.html', message='会員情報を更新しました。', user_id=line_user_id)
         else:
             # 新規登録処理
             # 最大の会員番号を取得して次の番号を割り振る
@@ -212,7 +212,7 @@ def register_member():
             )
             db.commit()
             # HTMLを返すように修正
-            return render_template('registration_complete.html', message='会員登録が完了しました。')
+            return render_template('registration_complete.html', message='会員登録が完了しました。', user_id=line_user_id)
     except Exception as e:
         # エラーが発生した場合、ロールバックを行う
         db.rollback()
@@ -240,6 +240,19 @@ def index():
     index.htmlを表示する
     """
     return render_template("index.html")
+
+# 会員証表示
+@app.route('/show_member_card')
+def show_member_card():
+    user_id = request.args.get('user_id')
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT name, region, member_number FROM members WHERE line_user_id = ?", (user_id,))
+    member = cursor.fetchone()
+    if member:
+        return render_template('show_member_card.html', name=member[0], region=member[1], member_number=member[2])
+    else:
+        return "会員情報が見つかりません", 404
 
 
 if __name__ == "__main__":
