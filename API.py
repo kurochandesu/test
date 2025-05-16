@@ -4,7 +4,7 @@ LINE連携会員証システム
 
 機能概要:
 1.  LINEユーザーがLINE公式アカウントを通じて会員証登録を行う
-2.  ユーザーのLINE ID、メールアドレス、会員番号をデータベースに保存
+2.  ユーザーのLINE ID、名前、地域、メールアドレス、電話番号をデータベースに保存
 3.  ユーザーがLINE上で会員証情報を確認できる
 4.  管理者が登録された会員情報をWebインターフェースで確認できる
 
@@ -80,7 +80,10 @@ def init_db():
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS members (
                 line_user_id TEXT PRIMARY KEY,
-                email TEXT,
+                name TEXT NOT NULL,       -- 追加：名前
+                region TEXT NOT NULL,     -- 追加：地域
+                email TEXT,              -- 任意
+                phone_number TEXT,       -- 任意
                 member_number TEXT
             )
         ''')
@@ -137,12 +140,12 @@ def handle_message(event):
         # データベースから会員情報を取得して表示
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("SELECT email, member_number FROM members WHERE line_user_id = ?", (user_id,))
+        cursor.execute("SELECT name, region, email, phone_number, member_number FROM members WHERE line_user_id = ?", (user_id,))
         row = cursor.fetchone()
 
         if row:
-            email, member_number = row
-            reply_text = f"メールアドレス: {email}\n会員番号: {member_number}"
+            name, region, email, phone_number, member_number = row
+            reply_text = f"名前: {name}\n地域: {region}\nメールアドレス: {email}\n電話番号: {phone_number}\n会員番号: {member_number}"
         else:
             reply_text = "会員情報が登録されていません。先に会員証登録を行ってください。"
 
@@ -171,11 +174,13 @@ def register_member():
     Webフォームから送信された会員情報を登録する
     """
     line_user_id = request.form['line_user_id']
-    email = request.form['email']
-    member_number = request.form['member_number']
+    name = request.form['name']  # 追加：名前を取得
+    region = request.form['region']  # 追加：地域を取得
+    email = request.form.get('email', '')  # 任意項目：デフォルト値を設定
+    phone_number = request.form.get('phone_number', '')  # 任意項目：デフォルト値を設定
 
     app.logger.info(
-        f"Registering user: {line_user_id}, Email: {email}, Member Number: {member_number}")  # ログ出力
+        f"Registering user: {line_user_id}, Name: {name}, Region: {region}, Email: {email}, Phone: {phone_number}")  # ログ出力
 
     db = get_db()
     cursor = db.cursor()
@@ -187,17 +192,23 @@ def register_member():
         if existing_member:
             # 更新処理
             cursor.execute(
-                "UPDATE members SET email = ?, member_number = ? WHERE line_user_id = ?",
-                (email, member_number, line_user_id)
+                "UPDATE members SET name = ?, region = ?, email = ?, phone_number = ? WHERE line_user_id = ?",
+                (name, region, email, phone_number, line_user_id)
             )
             db.commit()
             # HTMLを返すように修正
             return render_template('registration_complete.html', message='会員情報を更新しました。')
         else:
-            # 登録処理
+            # 新規登録処理
+            # 最大の会員番号を取得して次の番号を割り振る
+            cursor.execute("SELECT MAX(CAST(SUBSTR(member_number, 2) AS INTEGER)) FROM members")
+            max_number = cursor.fetchone()[0]
+            next_number = 1 if max_number is None else max_number + 1
+            member_number = f"M{next_number:04d}"  # M0001, M0002... の形式
+
             cursor.execute(
-                "INSERT INTO members (line_user_id, email, member_number) VALUES (?, ?, ?)",
-                (line_user_id, email, member_number)
+                "INSERT INTO members (line_user_id, name, region, email, phone_number, member_number) VALUES (?, ?, ?, ?, ?, ?)",
+                (line_user_id, name, region, email, phone_number, member_number)
             )
             db.commit()
             # HTMLを返すように修正
@@ -218,7 +229,7 @@ def list_members():
     """
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT line_user_id, email, member_number FROM members")
+    cursor.execute("SELECT line_user_id, name, region, email, phone_number, member_number FROM members")
     members = cursor.fetchall()
     return render_template('member_list.html', members=members)
 
