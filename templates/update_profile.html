@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>会員情報更新フォーム</title>
+</head>
+<body>
+    <h1>会員情報更新フォーム</h1>
+    <form method="POST" action="/update_profile">
+        <input type="hidden" name="line_user_id" value="{{ user_id }}">
+        <p>メールアドレス: <input type="email" name="email" value="{{ email }}"></p>
+        <p>会員番号: <input type="text" name="member_number" value="{{ member_number }}"></p>
+        <button type="submit">更新する</button>
+    </form>
+</body>
+</html>
