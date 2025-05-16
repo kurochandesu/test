@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>会員情報一覧</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>会員情報一覧</h1>
+    <table>
+        <tr>
+            <th>LINEユーザーID</th>
+            <th>メールアドレス</th>
+            <th>会員番号</th>
+        </tr>
+        {% for member in members %}
+        <tr>
+            <td>{{ member[0] }}</td>
+            <td>{{ member[1] }}</td>
+            <td>{{ member[2] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
+
