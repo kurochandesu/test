@@ -5,11 +5,25 @@
 </head>
 <body>
     <h1>会員登録フォーム</h1>
-    <form method="POST" action="/register">
+    <form action="/register" method="post">
         <input type="hidden" name="line_user_id" value="{{ user_id }}">
-        <p>メールアドレス: <input type="email" name="email"></p>
-        <p>会員番号: <input type="text" name="member_number"></p>
-        <button type="submit">登録する</button>
+        <div>
+            <label for="name">名前 (必須):</label>
+            <input type="text" id="name" name="name" required>
+        </div>
+        <div>
+            <label for="region">地域 (必須):</label>
+            <input type="text" id="region" name="region" required>
+        </div>
+        <div>
+            <label for="email">メールアドレス (任意):</label>
+            <input type="email" id="email" name="email">
+        </div>
+        <div>
+            <label for="phone_number">電話番号 (任意):</label>
+            <input type="tel" id="phone_number" name="phone_number">
+        </div>
+        <button type="submit">登録</button>
     </form>
 </body>
 </html>
