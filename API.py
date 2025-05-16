@@ -1,3 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API.pyの内容</title>
+</head>
+<body>
+    <h1>API.pyの内容</h1>
+    <pre>
+        <code>
 # -*- coding: utf-8 -*-
 """
 LINE連携会員証システム
@@ -235,3 +244,8 @@ if __name__ == "__main__":
     # ポート番号を環境変数から取得するように変更 (Heroku対応)
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
+    </code>
+    </pre>
+</body>
+</html>
+
