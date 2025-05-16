@@ -1,3 +1,30 @@
+# -*- coding: utf-8 -*-
+"""
+LINE連携会員証システム
+
+機能概要:
+1.  LINEユーザーがLINE公式アカウントを通じて会員証登録を行う
+2.  ユーザーのLINE ID、メールアドレス、会員番号をデータベースに保存
+3.  ユーザーがLINE上で会員証情報を確認できる
+4.  管理者が登録された会員情報をWebインターフェースで確認できる
+
+技術構成:
+* 言語: Python
+* フレームワーク: Flask
+* データベース: SQLite (ファイルベースの軽量DB)
+* LINE Messaging API
+
+開発手順:
+1.  FlaskとSQLiteのセットアップ
+2.  データベースの設計と作成
+3.  LINE Messaging APIの設定
+4.  Webhookエンドポイントの実装
+5.  会員登録処理の実装
+6.  会員証表示処理の実装
+7.  管理者用会員情報表示機能の実装
+
+"""
+
 import os
 import sqlite3
 from flask import Flask, request, jsonify, abort, render_template, url_for, redirect, g
@@ -9,6 +36,7 @@ from linebot.models import MessageEvent, TextMessage, TextSendMessage
 app = Flask(__name__)
 
 # 環境変数からLINE Botの設定情報を取得
+# 本番環境では、環境変数に設定することを推奨
 YOUR_CHANNEL_ACCESS_TOKEN = os.environ.get('YOUR_CHANNEL_ACCESS_TOKEN')
 YOUR_CHANNEL_SECRET = os.environ.get('YOUR_CHANNEL_SECRET')
 
@@ -98,6 +126,7 @@ def handle_message(event):
 
     if message_text == "会員証登録":
         # 登録フォームのURLを送信する
+        # Flaskのurl_for関数を使ってURLを生成する
         register_url = url_for('register_form', user_id=user_id, _external=True)
         reply_text = f"以下のURLから会員情報を登録してください。\n{register_url}"
         line_bot_api.reply_message(
@@ -117,12 +146,6 @@ def handle_message(event):
         else:
             reply_text = "会員情報が登録されていません。先に会員証登録を行ってください。"
 
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text=reply_text)
-        )
-    elif message_text == "登録完了": #追記
-        reply_text = "登録ありがとうございます。引き続きご利用ください。"
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text=reply_text)
@@ -169,7 +192,7 @@ def register_member():
             )
             db.commit()
             # HTMLを返すように修正
-            return render_template('registration_complete.html', message='会員情報を更新しました。',line_user_id=line_user_id) #追記
+            return render_template('registration_complete.html', message='会員情報を更新しました。')
         else:
             # 登録処理
             cursor.execute(
@@ -178,7 +201,7 @@ def register_member():
             )
             db.commit()
             # HTMLを返すように修正
-            return render_template('registration_complete.html', message='会員登録が完了しました。',line_user_id=line_user_id) #追記
+            return render_template('registration_complete.html', message='会員登録が完了しました。')
     except Exception as e:
         # エラーが発生した場合、ロールバックを行う
         db.rollback()
@@ -199,10 +222,6 @@ def list_members():
     members = cursor.fetchall()
     return render_template('member_list.html', members=members)
 
-@app.route('/registration_complete.html') #追記
-def registration_complete():
-    user_id = request.args.get('user_id')
-    return render_template('registration_complete.html',user_id=user_id)
 
 @app.route("/")
 def index():
@@ -216,4 +235,3 @@ if __name__ == "__main__":
     # ポート番号を環境変数から取得するように変更 (Heroku対応)
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
-
