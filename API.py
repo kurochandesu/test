@@ -27,7 +27,7 @@ LINE連携会員証システム
 
 import os
 import sqlite3
-from flask import Flask, request, jsonify, abort, render_template, url_for, redirect, g
+from flask import Flask, request, jsonify, abort, render_template, url_for, redirect, g, flash
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
@@ -36,6 +36,7 @@ import random
 
 # アプリ設定
 app = Flask(__name__)
+app.secret_key = 'your_secret_key_here' # flashメッセージのためにシークレットキーを設定
 
 # ロギング設定
 logging.basicConfig(level=logging.INFO)
@@ -80,13 +81,23 @@ def close_db(e=None):
 def init_db():
     """
     データベースを初期化する（テーブル作成など）
+    schema.sql に依存せず、直接テーブルを作成するように変更
     """
     with app.app_context():
         db = get_db()
-        with app.open_resource('schema.sql', mode='r') as f:
-            db.cursor().executescript(f.read())
+        cursor = db.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS members (
+                line_user_id TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                region TEXT NOT NULL,
+                email TEXT,
+                phone_number TEXT,
+                member_number TEXT NOT NULL UNIQUE
+            )
+        ''')
         db.commit()
-        logger.info("Initialized the database.")
+        logger.info("Database initialized and members table created.")
 
 # アプリケーション起動時にデータベースを初期化
 # init_db() # コメントアウト。run.pyで初期化するように変更
@@ -129,7 +140,6 @@ def handle_message(event):
         reply_message = f"以下のURLから会員登録を行ってください。\n{register_url}"
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_message))
     elif text == "会員証":
-        #show_member_card(line_user_id) #修正必要
         db = get_db()
         cursor = db.cursor()
         cursor.execute("SELECT name, region, member_number FROM members WHERE line_user_id = ?", (line_user_id,))
@@ -188,36 +198,44 @@ def register():
         cursor.execute("SELECT * FROM members WHERE line_user_id = ?", (line_user_id,))
         existing_member = cursor.fetchone()
         if existing_member:
-            return jsonify({'error': '登録失敗', 'message': 'このLINEユーザーIDはすでに登録されています。'}), 400
+            # 既に登録されている場合は更新として扱う
+            member_number = existing_member['member_number'] # 既存の会員番号を使用
+            cursor.execute(
+                "UPDATE members SET name = ?, region = ?, email = ?, phone_number = ? WHERE line_user_id = ?",
+                (name, region, email, phone_number, line_user_id)
+            )
+            db.commit()
+            return render_template('registration_complete.html', message='会員情報を更新しました。', user_id=line_user_id)
 
-        # メールアドレスの形式チェック (簡易的な例)
-        if email and "@" not in email:
-            raise ValueError("メールアドレスの形式が正しくありません。")
+        else:
+            # メールアドレスの形式チェック (簡易的な例)
+            if email and "@" not in email:
+                raise ValueError("メールアドレスの形式が正しくありません。")
 
-        # 電話番号の形式チェック (簡易的な例)
-        if phone_number and not phone_number.isdigit():
-            raise ValueError("電話番号の形式が正しくありません。")
-        
-        # 会員番号の重複チェック
-        member_number = generate_member_number()
+            # 電話番号の形式チェック (簡易的な例)
+            if phone_number and not phone_number.isdigit():
+                raise ValueError("電話番号の形式が正しくありません。")
+            
+            # 会員番号の重複チェックと生成
+            member_number = generate_member_number()
 
-        # 登録処理
-        cursor.execute(
-            "INSERT INTO members (line_user_id, name, region, email, phone_number, member_number) VALUES (?, ?, ?, ?, ?, ?)",
-            (line_user_id, name, region, email, phone_number, member_number),
-        )
-        db.commit()
-        return render_template('registration_complete.html', message='会員登録が完了しました。', user_id=line_user_id)
+            # 登録処理
+            cursor.execute(
+                "INSERT INTO members (line_user_id, name, region, email, phone_number, member_number) VALUES (?, ?, ?, ?, ?, ?)",
+                (line_user_id, name, region, email, phone_number, member_number),
+            )
+            db.commit()
+            return render_template('registration_complete.html', message='会員登録が完了しました。', user_id=line_user_id)
 
     except ValueError as ve:
         db.rollback()
         logger.error(f"Validation Error: {ve}")
+        # flash(str(ve)) # HTMLテンプレートでメッセージを表示する場合はflashを使用
         return jsonify({'error': '入力エラー', 'message': str(ve)}), 400  # 400 Bad Request
     except Exception as e:
         db.rollback()
         logger.error(f"Error registering member: {e}")
         return jsonify({'error': '登録失敗', 'message': '会員登録に失敗しました。' + str(e)}), 500
-
 
 
 # 管理者用：会員情報一覧表示
@@ -253,7 +271,8 @@ def show_member_card():
         member_number = member['member_number']
         return render_template('show_member_card.html', name=name, region=region, member_number=member_number)
     else:
-        return render_template('registration_required.html')  # 登録を促すページを表示
+        # 登録されていない場合は、登録フォームにリダイレクト
+        return redirect(url_for('show_registration_form', user_id=user_id))
 
 @app.route('/update_profile', methods=['GET', 'POST'])
 def update_profile():
@@ -262,7 +281,13 @@ def update_profile():
     """
     db = get_db()
     cursor = db.cursor()
-    user_id = request.form.get('line_user_id') # hidden fieldから取得
+    user_id = request.args.get('user_id') # GETリクエストの場合はクエリパラメータから取得
+    if request.method == 'POST':
+        user_id = request.form.get('line_user_id') # POSTリクエストの場合はフォームデータから取得
+
+    if user_id is None:
+        # user_id がない場合はエラーハンドリング
+        return jsonify({'error': 'エラー', 'message': 'LINEユーザーIDが指定されていません。'}), 400
 
     if request.method == 'POST':
         email = request.form.get('email')
@@ -272,8 +297,11 @@ def update_profile():
             # バリデーション:  必要であれば、emailとmember_numberの形式チェックを行う
             if email and "@" not in email:
                 raise ValueError("メールアドレスの形式が正しくありません。")
-            if member_number and not member_number.startswith("M"):
-                raise ValueError("会員番号の形式が正しくありません。")
+            # 会員番号の形式チェックは、generate_member_numberでMから始まる形式を生成しているので、
+            # ユーザーが直接入力する更新フォームでは、Mから始まる形式を強制しない方が良いかもしれません。
+            # もしMから始まる形式を強制する場合は、以下のコメントアウトを解除してください。
+            # if member_number and not member_number.startswith("M"):
+            #     raise ValueError("会員番号の形式が正しくありません。")
 
             cursor.execute(
                 "UPDATE members SET email = ?, member_number = ? WHERE line_user_id = ?",
@@ -298,7 +326,8 @@ def update_profile():
             member_number = member['member_number']
             return render_template('update_profile.html', user_id=user_id, email=email, member_number=member_number)
         else:
-            return render_template('registration_required.html') # 登録を促すページを表示
+            # 登録を促すページを表示する代わりに、登録フォームにリダイレクト
+            return redirect(url_for('show_registration_form', user_id=user_id))
 
 if __name__ == "__main__":
     # データベース初期化を行う
